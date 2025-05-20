@@ -222,7 +222,7 @@
     const repColorMapping = { 
       'Sonder & Associates': '#244c60',
       '808 Building Supplies': '#f7aa4b',
-      'Ecomaxx BP': '#3EA0C劳动6',
+      'Ecomaxx BP': '#3EA0C6',
       'EmLi, Inc.': '#ef5f2c',
       'Engineered Systems': '#f7aa4b',
       'Florida Building Envelope Associates': '#f7aa4b',
@@ -275,35 +275,17 @@
       caribbean: 'Florida Building Envelope Associates'
     };
 
-    // Define regionView for mobile and laptop with adjusted bounds
+    // Define regionView for mobile and laptop
     const mobileRegionView = {
-      us: { 
-        center: [-95, 37], 
-        zoom: 3, 
-        minZoom: 3, 
-        maxZoom: 8,
-        bounds: [[-125, 24], [-66, 49]] // Tighter bounds for contiguous USA, Alaska, Hawaii
-      },
-      canada: { 
-        center: [-95, 60], 
-        zoom: 2, 
-        minZoom: 2, 
-        maxZoom: 6,
-        bounds: [[-130, 45], [-60, 75]] // Bounds for Canada
-      },
-      caribbean: { 
-        center: [-70, 18], 
-        zoom: 4, 
-        minZoom: 4, 
-        maxZoom: 8,
-        bounds: [[-80, 12], [-60, 23]] // Bounds for Caribbean islands
-      }
+      us: { center: [0, 0], zoom: 2.5, minZoom: 2.5, maxZoom: 5 },
+      canada: { center: [-95, 70], zoom: 1.2, minZoom: 1.2, maxZoom: 4 },
+      caribbean: { center: [-70, 15], zoom: 3.3, minZoom: 3.3, maxZoom: 6 }
     };
 
     const laptopRegionView = {
-      us: { center: [-95, 37], zoom: 4, minZoom: 4, maxZoom: 10 },
-      canada: { center: [-95, 60], zoom: 3, minZoom: 3, maxZoom: 8 },
-      caribbean: { center: [-70, 18], zoom: 5, minZoom: 5, maxZoom: 10 }
+      us: { center: [10, 0], zoom: 3.8, minZoom: 3.8, maxZoom: 8 },
+      canada: { center: [-60, 72], zoom: 2, minZoom: 2, maxZoom: 6 },
+      caribbean: { center: [-60, 18], zoom: 4.5, minZoom: 4.5, maxZoom: 8 }
     };
 
     // Select regionView based on device type
@@ -459,16 +441,13 @@
       center: regionView.us.center,
       zoom: regionView.us.zoom,
       minZoom: regionView.us.minZoom,
-      maxZoom: regionView.us.maxZoom,
-      maxBounds: isMobileDevice() ? regionView.us.bounds : undefined,
-      touchZoomRotate: true
+      maxZoom: regionView.us.maxZoom
     });
 
-    // Enable touch zooming and panning on mobile devices with explicit configuration
+    // Enable touch zooming and panning on mobile devices
     if (isMobileDevice()) {
-      map.touchZoomRotate.enable({ around: 'center' });
+      map.touchZoomRotate.enable();
       map.dragPan.enable();
-      map.doubleClickZoom.disable(); // Prevent double-tap zoom conflicts
     }
 
     map.on('load', () => {
@@ -650,9 +629,6 @@
 
       map.setMinZoom(regionView[currentRegion].minZoom);
       map.setMaxZoom(regionView[currentRegion].maxZoom);
-      if (isMobileDevice()) {
-        map.setMaxBounds(regionView[currentRegion].bounds);
-      }
 
       // Validate center coordinates before jumping
       const center = regionView[currentRegion].center;
@@ -932,9 +908,6 @@
               center: regionView.us.center,
               zoom: regionView.us.zoom
             });
-            if (isMobileDevice()) {
-              map.setMaxBounds(regionView.us.bounds);
-            }
           }
         });
     }
