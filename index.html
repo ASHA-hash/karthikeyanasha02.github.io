@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>MapLibre Interactive Map with State Borders</title>
   <link href="https://unpkg.com/maplibre-gl@latest/dist/maplibre-gl.css" rel="stylesheet" />
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@700&display=swap" rel="stylesheet" />
@@ -121,6 +122,76 @@
     .sidebar-button:hover {
       background-color: #e6951f;
     }
+
+    /* Mobile-specific styles */
+    @media (max-width: 768px) {
+      #region-selector {
+        top: 10px;
+        padding: 10px 20px;
+        font-size: 16px;
+      }
+      .region-buttons {
+        top: 10px;
+        flex-direction: row;
+        gap: 15px;
+        width: 90%;
+        justify-content: center;
+        flex-wrap: wrap;
+      }
+      .region-buttons button {
+        font-size: 16px;
+        padding: 10px 15px;
+        min-width: 80px;
+        text-align: center;
+      }
+      .region-buttons .divider {
+        font-size: 16px;
+        margin: 0 2px;
+      }
+      .overlay-text {
+        top: auto;
+        bottom: 80px;
+        left: 50%;
+        transform: translateX(-50%);
+        max-width: 90%;
+        align-items: center;
+        text-align: center;
+        padding: 10px 15px;
+        background: rgba(0, 0, 0, 0.9);
+        border: 2px solid #444;
+        border-radius: 12px;
+        box-shadow: 0 6px 14px rgba(0, 0, 0, 0.6);
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+        display: flex;
+        flex-direction: row;
+        gap: 10px;
+        align-items: center;
+        justify-content: center;
+      }
+      .overlay-text:hover {
+        transform: translateX(-50%) scale(1.03);
+        box-shadow: 0 8px 18px rgba(0, 0, 0, 0.7);
+      }
+      .overlay-text.mobile p {
+        font-size: 14px;
+        color: #CCCCCC;
+        margin: 0;
+        padding: 5px 10px;
+        border-right: 1px solid #555;
+      }
+      .overlay-text h2 {
+        font-size: 16px;
+        margin: 0;
+        padding: 5px 10px;
+        border-right: 1px solid #555;
+      }
+      .sidebar-button {
+        font-size: 12px;
+        padding: 8px 16px;
+        border-radius: 6px;
+        margin: 0;
+      }
+    }
   </style>
 </head>
 <body>
@@ -189,8 +260,6 @@
     const repColorMap = new Map();
     const repToCountyIds = new Map();
     const countyToAdm2Map = new Map();
-    let selectedCountyId = null;
-    let isHoverEnabled = true;
 
     const regionSources = {
       us: 'counties.geojson',
@@ -203,11 +272,26 @@
       caribbean: 'Florida Building Envelope Associates'
     };
 
-    const regionView = {
-      us: { center: [10, 0], zoom: 3.8, minZoom: 3.8 },
-      canada: { center: [-60, 72], zoom: 2, minZoom: 2 },
-      caribbean: { center: [-60, 18], zoom: 4.5, minZoom: 4.5 }
+    // Define regionView for mobile and laptop
+    const mobileRegionView = {
+      us: { center: [0, 0], zoom: 2.5, minZoom: 2.5, maxZoom: 5 },
+      canada: { center: [-95, 70], zoom: 1.2, minZoom: 1.2, maxZoom: 4 },
+      caribbean: { center: [-70, 15], zoom: 3.3, minZoom: 3.3, maxZoom: 6 }
     };
+
+    const laptopRegionView = {
+      us: { center: [10, 0], zoom: 3.8, minZoom: 3.8, maxZoom: 8 },
+      canada: { center: [-60, 72], zoom: 2, minZoom: 2, maxZoom: 6 },
+      caribbean: { center: [-60, 18], zoom: 4.5, minZoom: 4.5, maxZoom: 8 }
+    };
+
+    // Select regionView based on device type
+    const regionView = isMobileDevice() ? mobileRegionView : laptopRegionView;
+
+    function isMobileDevice() {
+      return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
+             ('ontouchstart' in window || navigator.maxTouchPoints > 0);
+    }
 
     const regionInitialColors = {
       us: '#4A4A4A',
@@ -343,8 +427,7 @@
       style: darkStyle,
       center: regionView.us.center,
       zoom: regionView.us.zoom,
-      minZoom: regionView.us.minZoom,
-      dragPan: false
+      minZoom: regionView.us.minZoom
     });
 
     map.on('load', () => {
@@ -357,88 +440,124 @@
       const repName = document.getElementById('rep-name');
       const sidebarButton = document.getElementById('sidebar-button');
 
-      function updateCountyInfo(feature) {
-        const countyName = feature.properties.NAME?.toLowerCase().replace(/ county$/, '').replace(/ city$/, '').replace(/ parish$/, '').trim();
-        const geoId = currentRegion === 'us' ? feature.properties.ADM2_CODE : feature.properties.NAME;
-        const rep = currentRegion === 'us' ? repMap.get(geoId) || 'N/A' : regionReps[currentRegion];
-        const displayName = feature.properties.NAME || currentRegion.toUpperCase();
+      // Handle mouse hover for non-mobile devices
+      if (!isMobileDevice()) {
+        map.on('mousemove', 'counties-fill', (e) => {
+          if (!map.getSource('counties') || !geojson) {
+            console.warn('No counties source or geojson available');
+            return;
+          }
+          map.getCanvas().style.cursor = 'pointer';
+          const feature = e.features[0];
+          const countyName = feature.properties.NAME?.toLowerCase().replace(/ county$/, '').replace(/ city$/, '').replace(/ parish$/, '').trim();
+          const geoId = currentRegion === 'us' ? feature.properties.ADM2_CODE : feature.properties.NAME;
+          const rep = currentRegion === 'us' ? repMap.get(geoId) || 'N/A' : regionReps[currentRegion];
+          const displayName = feature.properties.NAME || currentRegion.toUpperCase();
 
-        locationName.textContent = displayName;
-        repName.textContent = rep || regionReps[currentRegion] || 'N/A';
-        sidebarButton.style.display = 'block';
-      }
+          locationName.textContent = displayName;
+          repName.textContent = rep || regionReps[currentRegion] || 'N/A';
+          sidebarButton.style.display = 'block';
 
-      map.on('click', 'counties-fill', (e) => {
-        if (!map.getSource('counties') || !geojson) {
-          console.warn('No counties source or geojson available');
-          return;
-        }
+          console.log(`Hovering over ${displayName}, GeoID: ${geoId}, Rep: ${rep}, Color: ${repColorMap.get(rep) || regionInitialColors[currentRegion]}, Feature ID: ${feature.id}`);
 
-        const feature = e.features[0];
-        const featureId = feature.id;
+          if (currentRegion === 'us') {
+            repToCountyIds.forEach((ids, repKey) => {
+              ids.forEach(id => {
+                const isHover = repKey === rep;
+                map.setFeatureState({ source: 'counties', id }, { hover: isHover });
+                console.log(`Setting feature ${id} hover state to ${isHover} for rep ${repKey}`);
+              });
+            });
+          } else {
+            geojson.features.forEach((f, i) => {
+              map.setFeatureState({ source: 'counties', id: i }, { hover: true });
+              console.log(`Setting non-US feature ${i} hover state to true for ${regionReps[currentRegion]}`);
+            });
+          }
+        });
 
-        if (selectedCountyId === featureId) {
-          // Second click: restore hover effect
-          isHoverEnabled = true;
-          selectedCountyId = null;
+        map.on('mouseleave', 'counties-fill', () => {
+          map.getCanvas().style.cursor = '';
           locationName.textContent = 'Hover on your county';
           repName.textContent = 'Find a Representative';
           sidebarButton.style.display = 'none';
 
-          geojson.features.forEach((f, i) => {
-            map.setFeatureState({ source: 'counties', id: i }, { hover: false });
-          });
-        } else {
-          // First click: lock selection
-          isHoverEnabled = false;
-          selectedCountyId = featureId;
-          updateCountyInfo(feature);
-
-          geojson.features.forEach((f, i) => {
-            map.setFeatureState({ source: 'counties', id: i }, { hover: i === featureId });
-          });
-        }
-      });
-
-      map.on('mousemove', 'counties-fill', (e) => {
-        if (!isHoverEnabled || !map.getSource('counties') || !geojson) {
-          return;
-        }
-
-        map.getCanvas().style.cursor = 'pointer';
-        const feature = e.features[0];
-        updateCountyInfo(feature);
-
-        const geoId = currentRegion === 'us' ? feature.properties.ADM2_CODE : feature.properties.NAME;
-        const rep = currentRegion === 'us' ? repMap.get(geoId) || 'N/A' : regionReps[currentRegion];
-
-        if (currentRegion === 'us') {
-          repToCountyIds.forEach((ids, repKey) => {
-            ids.forEach(id => {
-              map.setFeatureState({ source: 'counties', id }, { hover: repKey === rep });
+          if (geojson) {
+            geojson.features.forEach((f, i) => {
+              map.setFeatureState({ source: 'counties', id: i }, { hover: false });
+              console.log(`Resetting feature ${i} hover state to false`);
             });
-          });
-        } else {
-          geojson.features.forEach((f, i) => {
-            map.setFeatureState({ source: 'counties', id: i }, { hover: true });
-          });
-        }
-      });
+          }
+        });
+      } else {
+        // Handle single tap (click) for mobile devices
+        map.on('click', 'counties-fill', (e) => {
+          if (!map.getSource('counties') || !geojson) {
+            console.warn('No counties source or geojson available');
+            return;
+          }
+          const feature = e.features[0];
+          const countyName = feature.properties.NAME?.toLowerCase().replace(/ county$/, '').replace(/ city$/, '').replace(/ parish$/, '').trim();
+          const geoId = currentRegion === 'us' ? feature.properties.ADM2_CODE : feature.properties.NAME;
+          const rep = currentRegion === 'us' ? repMap.get(geoId) || 'N/A' : regionReps[currentRegion];
+          const displayName = feature.properties.NAME || currentRegion.toUpperCase();
 
-      map.on('mouseleave', 'counties-fill', () => {
-        if (!isHoverEnabled) return;
+          locationName.textContent = displayName;
+          repName.textContent = rep || regionReps[currentRegion] || 'N/A';
+          sidebarButton.style.display = 'block';
 
-        map.getCanvas().style.cursor = '';
-        locationName.textContent = 'Hover on your county';
-        repName.textContent = 'Find a Representative';
-        sidebarButton.style.display = 'none';
+          console.log(`Single tap on ${displayName}, GeoID: ${geoId}, Rep: ${rep}, Color: ${repColorMap.get(rep) || regionInitialColors[currentRegion]}, Feature ID: ${feature.id}`);
 
-        if (geojson) {
+          // Reset all features to default state
           geojson.features.forEach((f, i) => {
             map.setFeatureState({ source: 'counties', id: i }, { hover: false });
           });
-        }
-      });
+
+          // Highlight only the tapped county
+          map.setFeatureState({ source: 'counties', id: feature.id }, { hover: true });
+          console.log(`Setting feature ${feature.id} hover state to true for single tap`);
+        });
+
+        // Handle double tap for mobile devices
+        map.on('dblclick', 'counties-fill', (e) => {
+          if (!map.getSource('counties') || !geojson) {
+            console.warn('No counties source or geojson available');
+            return;
+          }
+          const feature = e.features[0];
+          const countyName = feature.properties.NAME?.toLowerCase().replace(/ county$/, '').replace(/ city$/, '').replace(/ parish$/, '').trim();
+          const geoId = currentRegion === 'us' ? feature.properties.ADM2_CODE : feature.properties.NAME;
+          const rep = currentRegion === 'us' ? repMap.get(geoId) || 'N/A' : regionReps[currentRegion];
+          const displayName = feature.properties.NAME || currentRegion.toUpperCase();
+
+          locationName.textContent = displayName;
+          repName.textContent = rep || regionReps[currentRegion] || 'N/A';
+          sidebarButton.style.display = 'block';
+
+          console.log(`Double tap on ${displayName}, GeoID: ${geoId}, Rep: ${rep}, Color: ${repColorMap.get(rep) || regionInitialColors[currentRegion]}, Feature ID: ${feature.id}`);
+
+          // Reset all features to default state
+          geojson.features.forEach((f, i) => {
+            map.setFeatureState({ source: 'counties', id: i }, { hover: false });
+          });
+
+          // Highlight all counties with the same representative
+          if (currentRegion === 'us') {
+            repToCountyIds.forEach((ids, repKey) => {
+              ids.forEach(id => {
+                const isHover = repKey === rep;
+                map.setFeatureState({ source: 'counties', id }, { hover: isHover });
+                console.log(`Setting feature ${id} hover state to ${isHover} for rep ${repKey} on double tap`);
+              });
+            });
+          } else {
+            geojson.features.forEach((f, i) => {
+              map.setFeatureState({ source: 'counties', id: i }, { hover: true });
+              console.log(`Setting non-US feature ${i} hover state to true for ${regionReps[currentRegion]} on double tap`);
+            });
+          }
+        });
+      }
     });
 
     document.getElementById('region-selector').addEventListener('change', (e) => {
@@ -453,11 +572,12 @@
       if (currentRegion !== 'canada') document.getElementById('canada-btn').classList.add('inactive');
       if (currentRegion !== 'caribbean') document.getElementById('caribbean-btn').classList.add('inactive');
 
+      // Reset map view with zoom limits
       map.setMinZoom(regionView[currentRegion].minZoom);
       if (regionView[currentRegion].maxZoom) {
         map.setMaxZoom(regionView[currentRegion].maxZoom);
       } else {
-        map.setMaxZoom(20);
+        map.setMaxZoom(20); // Default maxZoom for other regions
       }
       map.jumpTo({
         center: regionView[currentRegion].center,
@@ -482,9 +602,6 @@
       document.getElementById('location-name').textContent = 'Hover on your county';
       document.getElementById('rep-name').textContent = 'Find a Representative';
       document.getElementById('sidebar-button').style.display = 'none';
-
-      selectedCountyId = null;
-      isHoverEnabled = true;
 
       loadRegion(currentRegion);
     });
@@ -677,6 +794,14 @@
               .catch(err => {
                 console.error('Error loading states.geojson:', err);
               });
+          }
+
+          // Apply bounds for non-US regions with tighter padding for Caribbean
+          if (region !== 'us' && !bounds.isEmpty()) {
+            map.fitBounds(bounds, { 
+              padding: region === 'caribbean' ? 10 : 20, 
+              duration: 0 
+            });
           }
 
           addCountyLayers(region);
